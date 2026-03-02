@@ -1,0 +1,440 @@
+---
+title: "Módulo 1: Modelos de regressão espacial para áreas"
+author: 
+    - name: Daví Barbosa Pereira de Sousa 
+      affiliation: Universidade Federal de Lavras 
+    - name: Marcela Silva de Araujo 
+      affiliation: Universidade Federal de Lavras 
+format: 
+  html: 
+    theme: cosmo
+editor: visual
+---
+
+## Pacotes
+
+Leitura dos pacotes necessário para executar as etapas de manipulação, análise geoestatística, ajuste de modelos e visualização.
+
+```{r pacotes}
+#| message: false
+#| warning: false
+library(dplyr)        # Manipulação de dados
+library(geobr)        # Shapefiles IBGE
+library(ggspatial)    # Extensão do ggplot2 para dados espaciais
+library(patchwork)    # combinar gráficos do ggplot2 em uma figura
+library(readxl)       # Leitura de dados formato Excel
+library(scales)       # controlar e formatar escalas em gráficos
+library(sf)           # Manipulação de dados espaciais
+library(spatialreg)   # Regressão espacial
+library(spdep)        # Manipulação de dados espaciais
+library(tidyverse)    # Manipulação de dados
+```
+
+## Leitura dos dados
+
+Importamos a base de dados e avaliamos suas características iniciais.
+
+```{r leitura da base}
+df_MG <- read_excel("Base_DengueCovariaveis.xlsx")
+glimpse(df_MG)
+```
+
+Os dados foram importados sem problemas aparentes. Extraímos, então, o shapefile do IBGE.
+
+```{r shape}
+# Obter a malha / shapefile do IBGE (Estados do Brasil)
+shp <- read_municipality(year = 2022) # último ano disponível: 2022
+
+# Obter a malha do Estado de Minas Gerais
+shp_MG <- shp |> filter(name_state=="Minas Gerais")
+
+glimpse(shp_MG)
+```
+
+Extraída sem problemas também. Unificamos as duas bases.
+
+```{r unificação}
+ShapeMG <- shp_MG %>%
+  left_join(df_MG, by = c("code_muni" = "ID"))
+
+summary(ShapeMG)
+```
+
+-   A incidência de dengue apresenta elevada heterogeneidade, variando de 108 a 31.442 casos por 100 mil habitantes, com média (7.324) superior à mediana (5.654), indicando assimetria positiva e presença de valores extremos.
+
+-   A cobertura de esgotamento sanitário também mostra forte desigualdade entre municípios (0% a 100%, média de 58%).
+
+-   Já a cobertura da Estratégia Saúde da Família apresenta baixa variabilidade, com mediana de 100%, sugerindo ampla universalização.
+
+-   O investimento em saúde é bastante assimétrico, com grande amplitude entre municípios, o que indica possíveis diferenças estruturais relacionadas ao porte populacional ou capacidade fiscal.
+
+## Visualização espacial
+
+Visualizamos a variável de incidência de dengue em 2024 por meio de mapa, utilizando a técnica de quintis. Para isto, definimos e aplicamos a técnica.
+
+```{r quintis}
+# Calcular quintis (20%, 40%, 60%, 80%, 100%)
+quantis_valores <- quantile(
+  ShapeMG$Inc_Dengue_24,
+  probs = seq(0, 1, by = 0.2),
+  na.rm = TRUE
+)
+
+quantis_valores
+```
+
+Com a definição dos quintis, configuramos e apresentamos o mapa.
+
+```{r config do mapa}
+# Criar intervalos corretamente
+intervalos <- quantis_valores
+
+#Criar rótulos 
+legendas <- paste0(
+  round(intervalos[-length(intervalos)], 2),
+  " - ",
+  round(intervalos[-1], 2)
+)
+# Cores
+cores <- colorRampPalette(c("white", "#FFC600", "#FF8D00", "#FF3800", "darkred"))(5)
+names(cores) <- legendas
+
+# Criar variável de classe
+ShapeMG$quantis <- cut(
+  ShapeMG$Inc_Dengue_24,
+  breaks = intervalos,
+  include.lowest = TRUE,
+  labels = legendas
+)
+
+# Mapa
+ggplot(data = ShapeMG) +
+  geom_sf(aes(fill = quantis), color = "darkgray", size = 0.2) +
+  scale_fill_manual(values = cores, name = "Incidência\npor 100 mil hab") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    legend.position = "right",
+    legend.text = element_text(size = 10),
+    axis.title = element_blank()
+  ) +
+  labs(title = "Incidência de Dengue - Minas Gerais") +
+  annotation_scale(location = "tl", width_hint = 0.4) +
+  annotation_north_arrow(location = "br",
+                         which_north = "true",
+                         pad_x = unit(0.5, "cm"),
+                         pad_y = unit(0.5, "cm"),
+                         style = north_arrow_fancy_orienteering)
+
+```
+
+O mapa evidencia forte heterogeneidade espacial na incidência de dengue em Minas Gerais. Observa-se a formação de clusters de alta incidência em regiões contíguas, indicando possível dependência espacial. O padrão visual sugere que o fenômeno não ocorre de forma aleatória no território, justificando a aplicação de testes de autocorrelação espacial e modelos de regressão espacial.
+
+## Estrutura espacial
+
+Criamos o objeto com os pesos espaciais/matriz de vizinhança.
+
+```{r matriz de vizinhança}
+viz <- poly2nb(ShapeMG)
+lw  <- nb2listw(viz, style = "W", zero.policy = TRUE); lw
+```
+
+-   853 regiões.
+-   4720 ligações não nulas. Isso significa 4720 relações de vizinhança registradas na matriz. Utilizamos para verificar a dependência espacial.
+-   Percentual de pesos não nulos: 0,6487%. Ou seja, menos de 1% da matriz tem valores diferentes de zero. Isso é completamente esperado. Matrizes espaciais são esparsas.
+-   Média de vizinhos: 5,53. Em média, cada município faz fronteira com cerca de 5 ou 6 municípios.
+
+Utilizamos para verificar a dependência espacial.
+
+```{r Moran g}
+moran.test(ShapeMG$Inc_Dengue_24, lw)
+```
+
+Existe autocorrelação espacial positiva moderada e altamente significativa. Municípios com alta incidência tendem a estar cercados por municípios com alta incidência. O mesmo vale para baixos valores.
+
+## Variável resposta
+
+Verificamos quanto à distribuição da variável de incidência de dengue, utilizando a raíz quadrada.
+
+```{r}
+hist(ShapeMG$Inc_Dengue_24, breaks = 30)
+hist(sqrt(ShapeMG$Inc_Dengue_24), breaks = 30)
+```
+
+-   No primeiro histograma é possível visualizar que é assimétrico à direita. Existe uma massa grande de municípios com valores relativamente baixos a moderados e uma cauda longa se estendendo até valores muito altos.
+
+-   Visualmente, o segundo histograma (da raiz quadrada de incidência de dengue) está muito mais simétrico. A cauda direita encurtou, a concentração central ficou mais evidente e a distribuição se aproxima da normalidade.
+
+Resumindo, variável original apresentou forte assimetria à direita, com presença de valores extremos. A transformação por raiz quadrada reduziu a assimetria e tornou a distribuição mais simétrica, contribuindo para melhor adequação aos pressupostos do modelo de regressão.
+
+## Simultaneous Autorregressive Model (SAR)
+
+Utilizamos como covariáveis do modelo as variáveis referente a população atendida com esgotamento sanitário em 2021 e 2022 (%), população atendida com equipes de saúde da família em 2023 (%) e investimento público em saúde em 2022 e 2023.
+
+```{r sar}
+modelo_sar <- spautolm(
+  sqrt(Inc_Dengue_24) ~ 
+    PopAtend_Esg_San_2122 +
+    Saude_Familia_23 +
+    InvestSaude_2223,
+  data = ShapeMG,
+  listw = lw,
+  zero.policy = TRUE,
+  family="SAR"
+)
+
+summary(modelo_sar)
+```
+
+### Pontos importantes
+
+-   rho = 0,57: Mais da metade da variação espacial da raiz da incidência está associada ao componente defasado espacial. Em termos simples: dengue em um município continua fortemente associada à dengue nos vizinhos. A estrutura espacial é central no fenômeno.
+
+-   O LR test para rho é altamente significativo (p \< 2e-16). Isso valida o uso do modelo SAR em vez de OLS simples.
+
+### Efeito das variáveis
+
+#### PopAtend_Esg_San_2122: coeficiente positivo e significativo. Em tese, maior cobertura de esgotamento deveria reduzir dengue. Se o sinal veio positivo, podem existir três hipóteses plausíveis:
+
+-   Municípios mais estruturados notificam melhor (efeito de vigilância).
+
+#### Saude_Familia_23: não foi estatisticamente significativa. Isso sugere que, após controlar saneamento, investimento e estrutura espacial, a cobertura de equipes de saúde da família não explica variação adicional relevante na raiz da incidência.
+
+#### InvestSaude_2223: positivo e não significativo. No modelo sar, o investimento público em saúde não impacta significativamente.
+
+### Análise de resíduos do modelo SAR
+
+```{r normalidade SAR}
+res_SAR <- residuals(modelo_sar)
+
+hist(res_SAR, breaks = 30)
+qqnorm(res_SAR)
+qqline(res_SAR)
+```
+
+-   No histograma, os resíduos aparentam estar aproximadamente normais.
+
+-   O Q-Q plot demonstra bom alinhamento com a reta teórica, sugerindo adequação dos pressupostos do modelo (com pequena diferença nas caldas).
+
+Verificamos se os resíduos possuem dependência espacial.
+
+```{r dependência espacial sar}
+moran.test(res_SAR, lw, zero.policy = TRUE)
+```
+
+O teste de Moran aplicado aos resíduos do modelo SAR não indicou autocorrelação espacial significativa, sugerindo que o modelo capturou adequadamente a dependência espacial presente nos dados.
+
+### Mapas dos modelo SAR
+
+Separamos as variáveis necessárias. Primeiro a raíz quadrada da incidência de dengue em Minas Gerais no ano de 2024, segundo os valores ajustados pelo modelo SAR e terceiro os resíduos.
+
+```{r var mapas SAR}
+ShapeMG <- ShapeMG %>%
+  mutate(
+    Inc_Dengue_sqrt = sqrt(Inc_Dengue_24),
+    Ajustado_SAR = fitted(modelo_sar),
+    Residuos_SAR = residuals(modelo_sar)
+  )
+```
+
+Motamos os quatro mapas, o primeiro é o de incidência bruta, enquanto os outros três são os das variáveis que selecionamos.
+
+```{r mapas SAR}
+mapa1 <- ggplot(ShapeMG) +
+  geom_sf(aes(fill = Inc_Dengue_24), color = NA) +
+  scale_fill_viridis_c(option = "magma", name = "Incidência") +
+  labs(title = "Incidência de Dengue (2024)") +
+  theme_minimal() +
+  theme(
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    panel.grid = element_blank()
+  )
+
+mapa2 <- ggplot(ShapeMG) +
+  geom_sf(aes(fill = Inc_Dengue_sqrt), color = NA) +
+  scale_fill_viridis_c(option = "plasma", name = "Raiz(Inc)") +
+  labs(title = "Raiz Quadrada da Incidência") +
+  theme_minimal() +
+  theme(
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    panel.grid = element_blank()
+  )
+
+mapa3 <- ggplot(ShapeMG) +
+  geom_sf(aes(fill = Ajustado_SAR), color = NA) +
+  scale_fill_viridis_c(option = "magma", name = "Ajustado") +
+  labs(title = "Valores Ajustados (SAR)") +
+  theme_minimal() +
+  theme(
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    panel.grid = element_blank()
+  )
+
+lim_res <- max(abs(ShapeMG$Residuos_SAR), na.rm = TRUE)
+
+mapa4 <- ggplot(ShapeMG) +
+  geom_sf(aes(fill = Residuos_SAR), color = NA) +
+  scale_fill_gradient2(
+    low = muted("blue"),
+    mid = "white",
+    high = muted("red"),
+    midpoint = 0,
+    limits = c(-lim_res, lim_res),
+    name = "Resíduos"
+  ) +
+  labs(title = "Resíduos do Modelo SAR") +
+  theme_minimal() +
+  theme(
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    panel.grid = element_blank()
+  )
+
+(mapa1 + mapa2) / (mapa3 + mapa4)
+```
+
+-   Primeiro mapa (superior esquerdo), é possível verificar manchas intensas no Centro-Sul e Sudeste, contraste forte entre municípios. Muito ruído visual, muita assimetria, extremos dominando.
+
+-   Segundo mapa (superior direito), comprime os extremos e revela padrões mais graduais. É possível enxergar estrutura sem a distorção dos valores muito altos.
+
+-   Terceiro mapa (inferior esquerdo), estima a raíz quadrada de incidência de dengue. É possível visualizar padrão consistente com os dois outros mapas.
+
+-   Quarto mapa (inferior direito), os resíduos não apresentam padrão espacial evidente, indicando adequada captura da dependência espacial.
+
+## Condicional Autorregressive Model (CAR)
+
+As mesmas covariáveis utilizadas no SAR foram utilizadas aqui.
+
+```{r car}
+modelo_car <- spautolm(
+  sqrt(Inc_Dengue_24) ~ 
+    PopAtend_Esg_San_2122 +
+    Saude_Familia_23 +
+    InvestSaude_2223,
+  data = ShapeMG,
+  listw = lw,
+  zero.policy = TRUE,
+  family="CAR"
+)
+
+summary(modelo_car)
+```
+
+### Pontos importantes
+
+-   lambda = 0,75: existe forte autocorrelação espacial nos componentes não observados do modelo.
+-   O LR test para lambda é altamente significativo (p \< 2e-16). Isso valida o uso do modelo CAR em vez de OLS simples.
+
+### Efeito das variáveis
+
+#### PopAtend_Esg_San_2122: coeficiente positivo e significativo. Semelhante ao ocorrido no modelo SAR.
+
+#### Saude_Familia_23: negativo e estatisticamente significativa. Isso sugere que, a cobertura de equipes de saúde da família reduz variação adicional relevante na raiz da incidência.
+
+#### InvestSaude_2223: negativo e significativo. No modelo car, o investimento público em saúde impacta significativa a queda de incidência.
+
+### Análise de resíduos do modelo CAR
+
+```{r normalidade car}
+res_CAR <- residuals(modelo_car)
+
+hist(res_CAR, breaks = 30)
+qqnorm(res_CAR)
+qqline(res_CAR)
+```
+
+Semelhante ao modelo SAR:
+
+-   No histograma, os resíduos aparentam estar aproximadamente normais.
+
+-   O Q-Q plot demonstra bom alinhamento com a reta teórica, sugerindo adequação dos pressupostos do modelo (com pequena diferença nas caldas).
+
+Verificamos se os resíduos possuem dependência espacial.
+
+```{r dependencia CAR}
+moran.test(res_CAR, lw, zero.policy = TRUE)
+```
+
+O teste de Moran aplicado aos resíduos do modelo CAR não indicou autocorrelação espacial significativa, sugerindo que o modelo capturou adequadamente a dependência espacial presente nos dados.
+
+### Mapas do modelo CAR
+
+Semelhante ao modelo SAR, selecionamos os valores ajustados/estimados pelo modelo CAR e os resíduos associados.
+
+```{r var mapas CAR}
+ShapeMG <- ShapeMG %>%
+  mutate(
+    Ajustado_CAR = fitted(modelo_car),
+    Residuos_CAR = residuals(modelo_car)
+  )
+```
+
+Configuramos os mapas.
+
+```{r mapas car}
+mapa5 <- ggplot(ShapeMG) +
+  geom_sf(aes(fill = Ajustado_CAR), color = NA) +
+  scale_fill_viridis_c(option = "magma", name = "Ajustado") +
+  labs(title = "Valores Ajustados (CAR)") +
+  theme_minimal() +
+  theme(
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    panel.grid = element_blank()
+  )
+
+lim_res <- max(abs(ShapeMG$Residuos_CAR), na.rm = TRUE)
+
+mapa6 <- ggplot(ShapeMG) +
+  geom_sf(aes(fill = Residuos_CAR), color = NA) +
+  scale_fill_gradient2(
+    low = muted("blue"),
+    mid = "white",
+    high = muted("red"),
+    midpoint = 0,
+    limits = c(-lim_res, lim_res),
+    name = "Resíduos"
+  ) +
+  labs(title = "Resíduos do Modelo CAR") +
+  theme_minimal() +
+  theme(
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    panel.grid = element_blank()
+  )
+
+(mapa1 + mapa2) / (mapa5 + mapa6)
+```
+
+Os primeiros dois mapas (superiores) são identicos aos exibidos antes.
+
+– No terceiro mapa (inferior esquerdo), os valores ajustados pelo modelo CAR reproduzem o padrão espacial observado na variável transformada, porém com maior suavização regional. Nota-se coerência espacial, indicando que o modelo capturou a dependência entre municípios vizinhos, preservando a estrutura territorial da incidência.
+
+– No quarto mapa (inferior direito), os resíduos não apresentam padrão espacial evidente. A distribuição parece aleatória, sem formação de clusters consistentes de super ou subestimação. Esse resultado é consistente com o teste de Moran aplicado aos resíduos, sugerindo que a dependência espacial foi adequadamente modelada.
+
+## Visualização geral
+
+```{r todos os mapas}
+(mapa1 + mapa2) / (mapa3 + mapa4) / (mapa5 + mapa6)
+```
+
+Ambos os modelos espaciais conseguem capturar a dependência territorial da dengue, reduzindo a autocorrelação residual observada no modelo linear tradicional. Visualmente, SAR e CAR produzem superfícies ajustadas bastante semelhantes, sugerindo que a estrutura espacial é robusta e não depende fortemente da especificação escolhida.
+
+::: aside
+## 🌐 Conecte-se conosco
+
+👨‍💻 **Daví Sousa**\
+🔗 [LinkedIn](https://www.linkedin.com/in/daví-sousa-41b874180/)\
+📚 [Lattes](http://lattes.cnpq.br/4206431803366749)
+
+👩‍💻 **Marcela Araujo**\
+🔗 [LinkedIn](https://www.linkedin.com/in/marcela-araujoo/)\
+📚 [Lattes](http://lattes.cnpq.br/8522510498165639)
+
+------------------------------------------------------------------------
+
+✨ Este trabalho foi desenvolvido com [Quarto](https://quarto.org) e com ❤️
+:::
