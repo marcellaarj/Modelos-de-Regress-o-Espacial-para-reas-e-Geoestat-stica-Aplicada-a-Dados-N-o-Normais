@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.5.56">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Daví Barbosa Pereira de Sousa">
+<meta name="author" content="Marcela Silva de Araujo">
+
+<title>Módulo 1: Modelos de regressão espacial para áreas</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="QMD_Modulo1_files/libs/clipboard/clipboard.min.js"></script>
+<script src="QMD_Modulo1_files/libs/quarto-html/quarto.js"></script>
+<script src="QMD_Modulo1_files/libs/quarto-html/popper.min.js"></script>
+<script src="QMD_Modulo1_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="QMD_Modulo1_files/libs/quarto-html/anchor.min.js"></script>
+<link href="QMD_Modulo1_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="QMD_Modulo1_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="QMD_Modulo1_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="QMD_Modulo1_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="QMD_Modulo1_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body>
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar zindex-bottom">
+</div>
+<main class="content page-columns page-full" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Módulo 1: Modelos de regressão espacial para áreas</h1>
+</div>
+
+
+<div class="quarto-title-meta-author">
+  <div class="quarto-title-meta-heading">Authors</div>
+  <div class="quarto-title-meta-heading">Affiliation</div>
+  
+    <div class="quarto-title-meta-contents">
+    <p class="author">Daví Barbosa Pereira de Sousa </p>
+  </div>
+  <div class="quarto-title-meta-contents">
+        <p class="affiliation">
+            Universidade Federal de Lavras
+          </p>
+      </div>
+    <div class="quarto-title-meta-contents">
+    <p class="author">Marcela Silva de Araujo </p>
+  </div>
+  <div class="quarto-title-meta-contents">
+        <p class="affiliation">
+            Universidade Federal de Lavras
+          </p>
+      </div>
+  </div>
+
+<div class="quarto-title-meta">
+
+      
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="pacotes" class="level2">
+<h2 class="anchored" data-anchor-id="pacotes">Pacotes</h2>
+<p>Leitura dos pacotes necessário para executar as etapas de manipulação, análise geoestatística, ajuste de modelos e visualização.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(dplyr)        <span class="co"># Manipulação de dados</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(geobr)        <span class="co"># Shapefiles IBGE</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggspatial)    <span class="co"># Extensão do ggplot2 para dados espaciais</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(patchwork)    <span class="co"># combinar gráficos do ggplot2 em uma figura</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(readxl)       <span class="co"># Leitura de dados formato Excel</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(scales)       <span class="co"># controlar e formatar escalas em gráficos</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(sf)           <span class="co"># Manipulação de dados espaciais</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(spatialreg)   <span class="co"># Regressão espacial</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(spdep)        <span class="co"># Manipulação de dados espaciais</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)    <span class="co"># Manipulação de dados</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="leitura-dos-dados" class="level2">
+<h2 class="anchored" data-anchor-id="leitura-dos-dados">Leitura dos dados</h2>
+<p>Importamos a base de dados e avaliamos suas características iniciais.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>df_MG <span class="ot">&lt;-</span> <span class="fu">read_excel</span>(<span class="st">"Base_DengueCovariaveis.xlsx"</span>)</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">glimpse</span>(df_MG)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Rows: 853
+Columns: 6
+$ ID                    &lt;dbl&gt; 3100104, 3100203, 3100302, 3100401, 3100500, 310…
+$ Município             &lt;chr&gt; "Abadia dos Dourados", "Abaeté", "Abre Campo", "…
+$ Inc_Dengue_24         &lt;dbl&gt; 2010.998, 3125.944, 3584.405, 17237.928, 7904.39…
+$ PopAtend_Esg_San_2122 &lt;dbl&gt; 0.00, 10.68, 99.68, 65.31, 49.37, 0.00, 100.00, …
+$ Saude_Familia_23      &lt;dbl&gt; 99.70, 100.00, 100.00, 100.00, 100.00, 89.63, 10…
+$ InvestSaude_2223      &lt;dbl&gt; 1570.927, 1105.017, 1186.149, 1533.490, 869.107,…</code></pre>
+</div>
+</div>
+<p>Os dados foram importados sem problemas aparentes. Extraímos, então, o shapefile do IBGE.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Obter a malha / shapefile do IBGE (Estados do Brasil)</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>shp <span class="ot">&lt;-</span> <span class="fu">read_municipality</span>(<span class="at">year =</span> <span class="dv">2022</span>) <span class="co"># último ano disponível: 2022</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Using year/date 2022</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+  |                                                                            
+  |                                                                      |   0%
+  |                                                                            
+  |===                                                                   |   4%
+  |                                                                            
+  |=====                                                                 |   7%
+  |                                                                            
+  |========                                                              |  11%
+  |                                                                            
+  |==========                                                            |  15%
+  |                                                                            
+  |=============                                                         |  19%
+  |                                                                            
+  |================                                                      |  22%
+  |                                                                            
+  |==================                                                    |  26%
+  |                                                                            
+  |=====================                                                 |  30%
+  |                                                                            
+  |=======================                                               |  33%
+  |                                                                            
+  |==========================                                            |  37%
+  |                                                                            
+  |=============================                                         |  41%
+  |                                                                            
+  |===============================                                       |  44%
+  |                                                                            
+  |==================================                                    |  48%
+  |                                                                            
+  |====================================                                  |  52%
+  |                                                                            
+  |=======================================                               |  56%
+  |                                                                            
+  |=========================================                             |  59%
+  |                                                                            
+  |============================================                          |  63%
+  |                                                                            
+  |===============================================                       |  67%
+  |                                                                            
+  |=================================================                     |  70%
+  |                                                                            
+  |====================================================                  |  74%
+  |                                                                            
+  |======================================================                |  78%
+  |                                                                            
+  |=========================================================             |  81%
+  |                                                                            
+  |============================================================          |  85%
+  |                                                                            
+  |==============================================================        |  89%
+  |                                                                            
+  |=================================================================     |  93%
+  |                                                                            
+  |===================================================================   |  96%
+  |                                                                            
+  |======================================================================| 100%</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Obter a malha do Estado de Minas Gerais</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>shp_MG <span class="ot">&lt;-</span> shp <span class="sc">|&gt;</span> <span class="fu">filter</span>(name_state<span class="sc">==</span><span class="st">"Minas Gerais"</span>)</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="fu">glimpse</span>(shp_MG)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Rows: 853
+Columns: 8
+$ code_muni    &lt;dbl&gt; 3100104, 3100203, 3100302, 3100401, 3100500, 3100609, 310…
+$ name_muni    &lt;chr&gt; "Abadia dos Dourados", "Abaeté", "Abre Campo", "Acaiaca",…
+$ code_state   &lt;dbl&gt; 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 3…
+$ abbrev_state &lt;chr&gt; "MG", "MG", "MG", "MG", "MG", "MG", "MG", "MG", "MG", "MG…
+$ name_state   &lt;chr&gt; "Minas Gerais", "Minas Gerais", "Minas Gerais", "Minas Ge…
+$ code_region  &lt;dbl&gt; 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, …
+$ name_region  &lt;chr&gt; "Sudeste", "Sudeste", "Sudeste", "Sudeste", "Sudeste", "S…
+$ geom         &lt;MULTIPOLYGON [°]&gt; MULTIPOLYGON (((-47.45044 -..., MULTIPOLYGON…</code></pre>
+</div>
+</div>
+<p>Extraída sem problemas também. Unificamos as duas bases.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>ShapeMG <span class="ot">&lt;-</span> shp_MG <span class="sc">%&gt;%</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(df_MG, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"code_muni"</span> <span class="ot">=</span> <span class="st">"ID"</span>))</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(ShapeMG)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>   code_muni        name_muni           code_state abbrev_state      
+ Min.   :3100104   Length:853         Min.   :31   Length:853        
+ 1st Qu.:3119500   Class :character   1st Qu.:31   Class :character  
+ Median :3137304   Mode  :character   Median :31   Mode  :character  
+ Mean   :3136982                      Mean   :31                     
+ 3rd Qu.:3154903                      3rd Qu.:31                     
+ Max.   :3172202                      Max.   :31                     
+  name_state         code_region name_region         Município        
+ Length:853         Min.   :3    Length:853         Length:853        
+ Class :character   1st Qu.:3    Class :character   Class :character  
+ Mode  :character   Median :3    Mode  :character   Mode  :character  
+                    Mean   :3                                         
+                    3rd Qu.:3                                         
+                    Max.   :3                                         
+ Inc_Dengue_24     PopAtend_Esg_San_2122 Saude_Familia_23 InvestSaude_2223 
+ Min.   :  108.4   Min.   :  0.00        Min.   :  0.00   Min.   :  538.5  
+ 1st Qu.: 3150.1   1st Qu.: 33.67        1st Qu.: 95.75   1st Qu.: 1175.0  
+ Median : 5654.4   Median : 65.38        Median :100.00   Median : 1428.6  
+ Mean   : 7324.1   Mean   : 58.62        Mean   : 95.98   Mean   : 1607.8  
+ 3rd Qu.: 9941.4   3rd Qu.: 87.79        3rd Qu.:100.00   3rd Qu.: 1847.5  
+ Max.   :31441.9   Max.   :100.00        Max.   :100.00   Max.   :21888.7  
+            geom    
+ MULTIPOLYGON :853  
+ epsg:4674    :  0  
+ +proj=long...:  0  
+                    
+                    
+                    </code></pre>
+</div>
+</div>
+<ul>
+<li><p>A incidência de dengue apresenta elevada heterogeneidade, variando de 108 a 31.442 casos por 100 mil habitantes, com média (7.324) superior à mediana (5.654), indicando assimetria positiva e presença de valores extremos.</p></li>
+<li><p>A cobertura de esgotamento sanitário também mostra forte desigualdade entre municípios (0% a 100%, média de 58%).</p></li>
+<li><p>Já a cobertura da Estratégia Saúde da Família apresenta baixa variabilidade, com mediana de 100%, sugerindo ampla universalização.</p></li>
+<li><p>O investimento em saúde é bastante assimétrico, com grande amplitude entre municípios, o que indica possíveis diferenças estruturais relacionadas ao porte populacional ou capacidade fiscal.</p></li>
+</ul>
+</section>
+<section id="visualização-espacial" class="level2">
+<h2 class="anchored" data-anchor-id="visualização-espacial">Visualização espacial</h2>
+<p>Visualizamos a variável de incidência de dengue em 2024 por meio de mapa, utilizando a técnica de quintis. Para isto, definimos e aplicamos a técnica.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Calcular quintis (20%, 40%, 60%, 80%, 100%)</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>quantis_valores <span class="ot">&lt;-</span> <span class="fu">quantile</span>(</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  ShapeMG<span class="sc">$</span>Inc_Dengue_24,</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">probs =</span> <span class="fu">seq</span>(<span class="dv">0</span>, <span class="dv">1</span>, <span class="at">by =</span> <span class="fl">0.2</span>),</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">na.rm =</span> <span class="cn">TRUE</span></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>quantis_valores</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>       0%       20%       40%       60%       80%      100% 
+  108.393  2608.355  4602.993  7245.266 11503.230 31441.923 </code></pre>
+</div>
+</div>
+<p>Com a definição dos quintis, configuramos e apresentamos o mapa.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Criar intervalos corretamente</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>intervalos <span class="ot">&lt;-</span> quantis_valores</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a><span class="co">#Criar rótulos </span></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>legendas <span class="ot">&lt;-</span> <span class="fu">paste0</span>(</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">round</span>(intervalos[<span class="sc">-</span><span class="fu">length</span>(intervalos)], <span class="dv">2</span>),</span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>  <span class="st">" - "</span>,</span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">round</span>(intervalos[<span class="sc">-</span><span class="dv">1</span>], <span class="dv">2</span>)</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Cores</span></span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>cores <span class="ot">&lt;-</span> <span class="fu">colorRampPalette</span>(<span class="fu">c</span>(<span class="st">"white"</span>, <span class="st">"#FFC600"</span>, <span class="st">"#FF8D00"</span>, <span class="st">"#FF3800"</span>, <span class="st">"darkred"</span>))(<span class="dv">5</span>)</span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a><span class="fu">names</span>(cores) <span class="ot">&lt;-</span> legendas</span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a><span class="co"># Criar variável de classe</span></span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>ShapeMG<span class="sc">$</span>quantis <span class="ot">&lt;-</span> <span class="fu">cut</span>(</span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>  ShapeMG<span class="sc">$</span>Inc_Dengue_24,</span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a>  <span class="at">breaks =</span> intervalos,</span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a>  <span class="at">include.lowest =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a>  <span class="at">labels =</span> legendas</span>
+<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a><span class="co"># Mapa</span></span>
+<span id="cb13-23"><a href="#cb13-23" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="at">data =</span> ShapeMG) <span class="sc">+</span></span>
+<span id="cb13-24"><a href="#cb13-24" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> quantis), <span class="at">color =</span> <span class="st">"darkgray"</span>, <span class="at">size =</span> <span class="fl">0.2</span>) <span class="sc">+</span></span>
+<span id="cb13-25"><a href="#cb13-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(<span class="at">values =</span> cores, <span class="at">name =</span> <span class="st">"Incidência</span><span class="sc">\n</span><span class="st">por 100 mil hab"</span>) <span class="sc">+</span></span>
+<span id="cb13-26"><a href="#cb13-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
+<span id="cb13-27"><a href="#cb13-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
+<span id="cb13-28"><a href="#cb13-28" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.title =</span> <span class="fu">element_text</span>(<span class="at">hjust =</span> <span class="fl">0.5</span>),</span>
+<span id="cb13-29"><a href="#cb13-29" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.position =</span> <span class="st">"right"</span>,</span>
+<span id="cb13-30"><a href="#cb13-30" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.text =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">10</span>),</span>
+<span id="cb13-31"><a href="#cb13-31" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.title =</span> <span class="fu">element_blank</span>()</span>
+<span id="cb13-32"><a href="#cb13-32" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb13-33"><a href="#cb13-33" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Incidência de Dengue - Minas Gerais"</span>) <span class="sc">+</span></span>
+<span id="cb13-34"><a href="#cb13-34" aria-hidden="true" tabindex="-1"></a>  <span class="fu">annotation_scale</span>(<span class="at">location =</span> <span class="st">"tl"</span>, <span class="at">width_hint =</span> <span class="fl">0.4</span>) <span class="sc">+</span></span>
+<span id="cb13-35"><a href="#cb13-35" aria-hidden="true" tabindex="-1"></a>  <span class="fu">annotation_north_arrow</span>(<span class="at">location =</span> <span class="st">"br"</span>,</span>
+<span id="cb13-36"><a href="#cb13-36" aria-hidden="true" tabindex="-1"></a>                         <span class="at">which_north =</span> <span class="st">"true"</span>,</span>
+<span id="cb13-37"><a href="#cb13-37" aria-hidden="true" tabindex="-1"></a>                         <span class="at">pad_x =</span> <span class="fu">unit</span>(<span class="fl">0.5</span>, <span class="st">"cm"</span>),</span>
+<span id="cb13-38"><a href="#cb13-38" aria-hidden="true" tabindex="-1"></a>                         <span class="at">pad_y =</span> <span class="fu">unit</span>(<span class="fl">0.5</span>, <span class="st">"cm"</span>),</span>
+<span id="cb13-39"><a href="#cb13-39" aria-hidden="true" tabindex="-1"></a>                         <span class="at">style =</span> north_arrow_fancy_orienteering)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="QMD_Modulo1_files/figure-html/config%20do%20mapa-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>O mapa evidencia forte heterogeneidade espacial na incidência de dengue em Minas Gerais. Observa-se a formação de clusters de alta incidência em regiões contíguas, indicando possível dependência espacial. O padrão visual sugere que o fenômeno não ocorre de forma aleatória no território, justificando a aplicação de testes de autocorrelação espacial e modelos de regressão espacial.</p>
+</section>
+<section id="estrutura-espacial" class="level2">
+<h2 class="anchored" data-anchor-id="estrutura-espacial">Estrutura espacial</h2>
+<p>Criamos o objeto com os pesos espaciais/matriz de vizinhança.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>viz <span class="ot">&lt;-</span> <span class="fu">poly2nb</span>(ShapeMG)</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>lw  <span class="ot">&lt;-</span> <span class="fu">nb2listw</span>(viz, <span class="at">style =</span> <span class="st">"W"</span>, <span class="at">zero.policy =</span> <span class="cn">TRUE</span>); lw</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Characteristics of weights list object:
+Neighbour list object:
+Number of regions: 853 
+Number of nonzero links: 4720 
+Percentage nonzero weights: 0.6487001 
+Average number of links: 5.533411 
+
+Weights style: W 
+Weights constants summary:
+    n     nn  S0       S1       S2
+W 853 727609 853 332.8233 3596.143</code></pre>
+</div>
+</div>
+<ul>
+<li>853 regiões.</li>
+<li>4720 ligações não nulas. Isso significa 4720 relações de vizinhança registradas na matriz. Utilizamos para verificar a dependência espacial.</li>
+<li>Percentual de pesos não nulos: 0,6487%. Ou seja, menos de 1% da matriz tem valores diferentes de zero. Isso é completamente esperado. Matrizes espaciais são esparsas.</li>
+<li>Média de vizinhos: 5,53. Em média, cada município faz fronteira com cerca de 5 ou 6 municípios.</li>
+</ul>
+<p>Utilizamos para verificar a dependência espacial.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="fu">moran.test</span>(ShapeMG<span class="sc">$</span>Inc_Dengue_24, lw)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Moran I test under randomisation
+
+data:  ShapeMG$Inc_Dengue_24  
+weights: lw    
+
+Moran I statistic standard deviate = 15.584, p-value &lt; 2.2e-16
+alternative hypothesis: greater
+sample estimates:
+Moran I statistic       Expectation          Variance 
+     0.3306466874     -0.0011737089      0.0004533785 </code></pre>
+</div>
+</div>
+<p>Existe autocorrelação espacial positiva moderada e altamente significativa. Municípios com alta incidência tendem a estar cercados por municípios com alta incidência. O mesmo vale para baixos valores.</p>
+</section>
+<section id="variável-resposta" class="level2">
+<h2 class="anchored" data-anchor-id="variável-resposta">Variável resposta</h2>
+<p>Verificamos quanto à distribuição da variável de incidência de dengue, utilizando a raíz quadrada.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="fu">hist</span>(ShapeMG<span class="sc">$</span>Inc_Dengue_24, <span class="at">breaks =</span> <span class="dv">30</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="QMD_Modulo1_files/figure-html/unnamed-chunk-1-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="fu">hist</span>(<span class="fu">sqrt</span>(ShapeMG<span class="sc">$</span>Inc_Dengue_24), <span class="at">breaks =</span> <span class="dv">30</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="QMD_Modulo1_files/figure-html/unnamed-chunk-1-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<ul>
+<li><p>No primeiro histograma é possível visualizar que é assimétrico à direita. Existe uma massa grande de municípios com valores relativamente baixos a moderados e uma cauda longa se estendendo até valores muito altos.</p></li>
+<li><p>Visualmente, o segundo histograma (da raiz quadrada de incidência de dengue) está muito mais simétrico. A cauda direita encurtou, a concentração central ficou mais evidente e a distribuição se aproxima da normalidade.</p></li>
+</ul>
+<p>Resumindo, variável original apresentou forte assimetria à direita, com presença de valores extremos. A transformação por raiz quadrada reduziu a assimetria e tornou a distribuição mais simétrica, contribuindo para melhor adequação aos pressupostos do modelo de regressão.</p>
+</section>
+<section id="simultaneous-autorregressive-model-sar" class="level2">
+<h2 class="anchored" data-anchor-id="simultaneous-autorregressive-model-sar">Simultaneous Autorregressive Model (SAR)</h2>
+<p>Utilizamos como covariáveis do modelo as variáveis referente a população atendida com esgotamento sanitário em 2021 e 2022 (%), população atendida com equipes de saúde da família em 2023 (%) e investimento público em saúde em 2022 e 2023.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>modelo_sar <span class="ot">&lt;-</span> <span class="fu">spautolm</span>(</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">sqrt</span>(Inc_Dengue_24) <span class="sc">~</span> </span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>    PopAtend_Esg_San_2122 <span class="sc">+</span></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>    Saude_Familia_23 <span class="sc">+</span></span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>    InvestSaude_2223,</span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> ShapeMG,</span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">listw =</span> lw,</span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">zero.policy =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">family=</span><span class="st">"SAR"</span></span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(modelo_sar)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Call: spautolm(formula = sqrt(Inc_Dengue_24) ~ PopAtend_Esg_San_2122 + 
+    Saude_Familia_23 + InvestSaude_2223, data = ShapeMG, listw = lw, 
+    family = "SAR", zero.policy = TRUE)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-64.6640 -19.8295  -2.2776  17.9203 100.9154 
+
+Coefficients: 
+                        Estimate Std. Error z value  Pr(&gt;|z|)
+(Intercept)           72.3999676 10.8310457  6.6845 2.317e-11
+PopAtend_Esg_San_2122  0.0877575  0.0309149  2.8387   0.00453
+Saude_Familia_23      -0.0120225  0.1063533 -0.1130   0.91000
+InvestSaude_2223       0.0019147  0.0010185  1.8799   0.06012
+
+Lambda: 0.56908 LR test value: 198.61 p-value: &lt; 2.22e-16 
+Numerical Hessian standard error of lambda: 0.034925 
+
+Log likelihood: -4072.601 
+ML residual variance (sigma squared): 765.48, (sigma: 27.667)
+Number of observations: 853 
+Number of parameters estimated: 6 
+AIC: 8157.2</code></pre>
+</div>
+</div>
+<section id="pontos-importantes" class="level3">
+<h3 class="anchored" data-anchor-id="pontos-importantes">Pontos importantes</h3>
+<ul>
+<li><p>rho = 0,57: Mais da metade da variação espacial da raiz da incidência está associada ao componente defasado espacial. Em termos simples: dengue em um município continua fortemente associada à dengue nos vizinhos. A estrutura espacial é central no fenômeno.</p></li>
+<li><p>O LR test para rho é altamente significativo (p &lt; 2e-16). Isso valida o uso do modelo SAR em vez de OLS simples.</p></li>
+</ul>
+</section>
+<section id="efeito-das-variáveis" class="level3">
+<h3 class="anchored" data-anchor-id="efeito-das-variáveis">Efeito das variáveis</h3>
+<section id="popatend_esg_san_2122-coeficiente-positivo-e-significativo.-em-tese-maior-cobertura-de-esgotamento-deveria-reduzir-dengue.-se-o-sinal-veio-positivo-podem-existir-três-hipóteses-plausíveis" class="level4">
+<h4 class="anchored" data-anchor-id="popatend_esg_san_2122-coeficiente-positivo-e-significativo.-em-tese-maior-cobertura-de-esgotamento-deveria-reduzir-dengue.-se-o-sinal-veio-positivo-podem-existir-três-hipóteses-plausíveis">PopAtend_Esg_San_2122: coeficiente positivo e significativo. Em tese, maior cobertura de esgotamento deveria reduzir dengue. Se o sinal veio positivo, podem existir três hipóteses plausíveis:</h4>
+<ul>
+<li>Municípios mais estruturados notificam melhor (efeito de vigilância).</li>
+</ul>
+</section>
+<section id="saude_familia_23-não-foi-estatisticamente-significativa.-isso-sugere-que-após-controlar-saneamento-investimento-e-estrutura-espacial-a-cobertura-de-equipes-de-saúde-da-família-não-explica-variação-adicional-relevante-na-raiz-da-incidência." class="level4">
+<h4 class="anchored" data-anchor-id="saude_familia_23-não-foi-estatisticamente-significativa.-isso-sugere-que-após-controlar-saneamento-investimento-e-estrutura-espacial-a-cobertura-de-equipes-de-saúde-da-família-não-explica-variação-adicional-relevante-na-raiz-da-incidência.">Saude_Familia_23: não foi estatisticamente significativa. Isso sugere que, após controlar saneamento, investimento e estrutura espacial, a cobertura de equipes de saúde da família não explica variação adicional relevante na raiz da incidência.</h4>
+</section>
+<section id="investsaude_2223-positivo-e-não-significativo.-no-modelo-sar-o-investimento-público-em-saúde-não-impacta-significativamente." class="level4">
+<h4 class="anchored" data-anchor-id="investsaude_2223-positivo-e-não-significativo.-no-modelo-sar-o-investimento-público-em-saúde-não-impacta-significativamente.">InvestSaude_2223: positivo e não significativo. No modelo sar, o investimento público em saúde não impacta significativamente.</h4>
+</section>
+</section>
+<section id="análise-de-resíduos-do-modelo-sar" class="level3">
+<h3 class="anchored" data-anchor-id="análise-de-resíduos-do-modelo-sar">Análise de resíduos do modelo SAR</h3>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>res_SAR <span class="ot">&lt;-</span> <span class="fu">residuals</span>(modelo_sar)</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a><span class="fu">hist</span>(res_SAR, <span class="at">breaks =</span> <span class="dv">30</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="QMD_Modulo1_files/figure-html/normalidade%20SAR-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="fu">qqnorm</span>(res_SAR)</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a><span class="fu">qqline</span>(res_SAR)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="QMD_Modulo1_files/figure-html/normalidade%20SAR-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<ul>
+<li><p>No histograma, os resíduos aparentam estar aproximadamente normais.</p></li>
+<li><p>O Q-Q plot demonstra bom alinhamento com a reta teórica, sugerindo adequação dos pressupostos do modelo (com pequena diferença nas caldas).</p></li>
+</ul>
+<p>Verificamos se os resíduos possuem dependência espacial.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="fu">moran.test</span>(res_SAR, lw, <span class="at">zero.policy =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Moran I test under randomisation
+
+data:  res_SAR  
+weights: lw    
+
+Moran I statistic standard deviate = -1.4812, p-value = 0.9307
+alternative hypothesis: greater
+sample estimates:
+Moran I statistic       Expectation          Variance 
+    -0.0327469568     -0.0011737089      0.0004543814 </code></pre>
+</div>
+</div>
+<p>O teste de Moran aplicado aos resíduos do modelo SAR não indicou autocorrelação espacial significativa, sugerindo que o modelo capturou adequadamente a dependência espacial presente nos dados.</p>
+</section>
+<section id="mapas-dos-modelo-sar" class="level3">
+<h3 class="anchored" data-anchor-id="mapas-dos-modelo-sar">Mapas dos modelo SAR</h3>
+<p>Separamos as variáveis necessárias. Primeiro a raíz quadrada da incidência de dengue em Minas Gerais no ano de 2024, segundo os valores ajustados pelo modelo SAR e terceiro os resíduos.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>ShapeMG <span class="ot">&lt;-</span> ShapeMG <span class="sc">%&gt;%</span></span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">Inc_Dengue_sqrt =</span> <span class="fu">sqrt</span>(Inc_Dengue_24),</span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">Ajustado_SAR =</span> <span class="fu">fitted</span>(modelo_sar),</span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">Residuos_SAR =</span> <span class="fu">residuals</span>(modelo_sar)</span>
+<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Motamos os quatro mapas, o primeiro é o de incidência bruta, enquanto os outros três são os das variáveis que selecionamos.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>mapa1 <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(ShapeMG) <span class="sc">+</span></span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> Inc_Dengue_24), <span class="at">color =</span> <span class="cn">NA</span>) <span class="sc">+</span></span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_viridis_c</span>(<span class="at">option =</span> <span class="st">"magma"</span>, <span class="at">name =</span> <span class="st">"Incidência"</span>) <span class="sc">+</span></span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Incidência de Dengue (2024)"</span>) <span class="sc">+</span></span>
+<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
+<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
+<span id="cb27-7"><a href="#cb27-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.text =</span> <span class="fu">element_blank</span>(),</span>
+<span id="cb27-8"><a href="#cb27-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.title =</span> <span class="fu">element_blank</span>(),</span>
+<span id="cb27-9"><a href="#cb27-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">panel.grid =</span> <span class="fu">element_blank</span>()</span>
+<span id="cb27-10"><a href="#cb27-10" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb27-11"><a href="#cb27-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-12"><a href="#cb27-12" aria-hidden="true" tabindex="-1"></a>mapa2 <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(ShapeMG) <span class="sc">+</span></span>
+<span id="cb27-13"><a href="#cb27-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> Inc_Dengue_sqrt), <span class="at">color =</span> <span class="cn">NA</span>) <span class="sc">+</span></span>
+<span id="cb27-14"><a href="#cb27-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_viridis_c</span>(<span class="at">option =</span> <span class="st">"plasma"</span>, <span class="at">name =</span> <span class="st">"Raiz(Inc)"</span>) <span class="sc">+</span></span>
+<span id="cb27-15"><a href="#cb27-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Raiz Quadrada da Incidência"</span>) <span class="sc">+</span></span>
+<span id="cb27-16"><a href="#cb27-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
+<span id="cb27-17"><a href="#cb27-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
+<span id="cb27-18"><a href="#cb27-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.text =</span> <span class="fu">element_blank</span>(),</span>
+<span id="cb27-19"><a href="#cb27-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.title =</span> <span class="fu">element_blank</span>(),</span>
+<span id="cb27-20"><a href="#cb27-20" aria-hidden="true" tabindex="-1"></a>    <span class="at">panel.grid =</span> <span class="fu">element_blank</span>()</span>
+<span id="cb27-21"><a href="#cb27-21" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb27-22"><a href="#cb27-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-23"><a href="#cb27-23" aria-hidden="true" tabindex="-1"></a>mapa3 <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(ShapeMG) <span class="sc">+</span></span>
+<span id="cb27-24"><a href="#cb27-24" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> Ajustado_SAR), <span class="at">color =</span> <span class="cn">NA</span>) <span class="sc">+</span></span>
+<span id="cb27-25"><a href="#cb27-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_viridis_c</span>(<span class="at">option =</span> <span class="st">"magma"</span>, <span class="at">name =</span> <span class="st">"Ajustado"</span>) <span class="sc">+</span></span>
+<span id="cb27-26"><a href="#cb27-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Valores Ajustados (SAR)"</span>) <span class="sc">+</span></span>
+<span id="cb27-27"><a href="#cb27-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
+<span id="cb27-28"><a href="#cb27-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
+<span id="cb27-29"><a href="#cb27-29" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.text =</span> <span class="fu">element_blank</span>(),</span>
+<span id="cb27-30"><a href="#cb27-30" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.title =</span> <span class="fu">element_blank</span>(),</span>
+<span id="cb27-31"><a href="#cb27-31" aria-hidden="true" tabindex="-1"></a>    <span class="at">panel.grid =</span> <span class="fu">element_blank</span>()</span>
+<span id="cb27-32"><a href="#cb27-32" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb27-33"><a href="#cb27-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-34"><a href="#cb27-34" aria-hidden="true" tabindex="-1"></a>lim_res <span class="ot">&lt;-</span> <span class="fu">max</span>(<span class="fu">abs</span>(ShapeMG<span class="sc">$</span>Residuos_SAR), <span class="at">na.rm =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb27-35"><a href="#cb27-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-36"><a href="#cb27-36" aria-hidden="true" tabindex="-1"></a>mapa4 <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(ShapeMG) <span class="sc">+</span></span>
+<span id="cb27-37"><a href="#cb27-37" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> Residuos_SAR), <span class="at">color =</span> <span class="cn">NA</span>) <span class="sc">+</span></span>
+<span id="cb27-38"><a href="#cb27-38" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_gradient2</span>(</span>
+<span id="cb27-39"><a href="#cb27-39" aria-hidden="true" tabindex="-1"></a>    <span class="at">low =</span> <span class="fu">muted</span>(<span class="st">"blue"</span>),</span>
+<span id="cb27-40"><a href="#cb27-40" aria-hidden="true" tabindex="-1"></a>    <span class="at">mid =</span> <span class="st">"white"</span>,</span>
+<span id="cb27-41"><a href="#cb27-41" aria-hidden="true" tabindex="-1"></a>    <span class="at">high =</span> <span class="fu">muted</span>(<span class="st">"red"</span>),</span>
+<span id="cb27-42"><a href="#cb27-42" aria-hidden="true" tabindex="-1"></a>    <span class="at">midpoint =</span> <span class="dv">0</span>,</span>
+<span id="cb27-43"><a href="#cb27-43" aria-hidden="true" tabindex="-1"></a>    <span class="at">limits =</span> <span class="fu">c</span>(<span class="sc">-</span>lim_res, lim_res),</span>
+<span id="cb27-44"><a href="#cb27-44" aria-hidden="true" tabindex="-1"></a>    <span class="at">name =</span> <span class="st">"Resíduos"</span></span>
+<span id="cb27-45"><a href="#cb27-45" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb27-46"><a href="#cb27-46" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Resíduos do Modelo SAR"</span>) <span class="sc">+</span></span>
+<span id="cb27-47"><a href="#cb27-47" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
+<span id="cb27-48"><a href="#cb27-48" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
+<span id="cb27-49"><a href="#cb27-49" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.text =</span> <span class="fu">element_blank</span>(),</span>
+<span id="cb27-50"><a href="#cb27-50" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.title =</span> <span class="fu">element_blank</span>(),</span>
+<span id="cb27-51"><a href="#cb27-51" aria-hidden="true" tabindex="-1"></a>    <span class="at">panel.grid =</span> <span class="fu">element_blank</span>()</span>
+<span id="cb27-52"><a href="#cb27-52" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb27-53"><a href="#cb27-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-54"><a href="#cb27-54" aria-hidden="true" tabindex="-1"></a>(mapa1 <span class="sc">+</span> mapa2) <span class="sc">/</span> (mapa3 <span class="sc">+</span> mapa4)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="QMD_Modulo1_files/figure-html/mapas%20SAR-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<ul>
+<li><p>Primeiro mapa (superior esquerdo), é possível verificar manchas intensas no Centro-Sul e Sudeste, contraste forte entre municípios. Muito ruído visual, muita assimetria, extremos dominando.</p></li>
+<li><p>Segundo mapa (superior direito), comprime os extremos e revela padrões mais graduais. É possível enxergar estrutura sem a distorção dos valores muito altos.</p></li>
+<li><p>Terceiro mapa (inferior esquerdo), estima a raíz quadrada de incidência de dengue. É possível visualizar padrão consistente com os dois outros mapas.</p></li>
+<li><p>Quarto mapa (inferior direito), os resíduos não apresentam padrão espacial evidente, indicando adequada captura da dependência espacial.</p></li>
+</ul>
+</section>
+</section>
+<section id="condicional-autorregressive-model-car" class="level2">
+<h2 class="anchored" data-anchor-id="condicional-autorregressive-model-car">Condicional Autorregressive Model (CAR)</h2>
+<p>As mesmas covariáveis utilizadas no SAR foram utilizadas aqui.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>modelo_car <span class="ot">&lt;-</span> <span class="fu">spautolm</span>(</span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">sqrt</span>(Inc_Dengue_24) <span class="sc">~</span> </span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>    PopAtend_Esg_San_2122 <span class="sc">+</span></span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>    Saude_Familia_23 <span class="sc">+</span></span>
+<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a>    InvestSaude_2223,</span>
+<span id="cb28-6"><a href="#cb28-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> ShapeMG,</span>
+<span id="cb28-7"><a href="#cb28-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">listw =</span> lw,</span>
+<span id="cb28-8"><a href="#cb28-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">zero.policy =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb28-9"><a href="#cb28-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">family=</span><span class="st">"CAR"</span></span>
+<span id="cb28-10"><a href="#cb28-10" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning in spautolm(sqrt(Inc_Dengue_24) ~ PopAtend_Esg_San_2122 +
+Saude_Familia_23 + : Non-symmetric spatial weights in CAR model</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(modelo_car)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Call: spautolm(formula = sqrt(Inc_Dengue_24) ~ PopAtend_Esg_San_2122 + 
+    Saude_Familia_23 + InvestSaude_2223, data = ShapeMG, listw = lw, 
+    family = "CAR", zero.policy = TRUE)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-69.3637 -19.1145  -1.8913  19.3598 115.1368 
+
+Coefficients: 
+                         Estimate  Std. Error z value  Pr(&gt;|z|)
+(Intercept)           133.0342327  11.5911180 11.4773 &lt; 2.2e-16
+PopAtend_Esg_San_2122   0.1908302   0.0325326  5.8658 4.470e-09
+Saude_Familia_23       -0.6165337   0.1145478 -5.3823 7.353e-08
+InvestSaude_2223       -0.0032073   0.0010751 -2.9833  0.002851
+
+Lambda: 0.75448 LR test value: 140.9 p-value: &lt; 2.22e-16 
+Numerical Hessian standard error of lambda: 0.065708 
+
+Log likelihood: -4101.456 
+ML residual variance (sigma squared): 819.08, (sigma: 28.62)
+Number of observations: 853 
+Number of parameters estimated: 6 
+AIC: 8214.9</code></pre>
+</div>
+</div>
+<section id="pontos-importantes-1" class="level3">
+<h3 class="anchored" data-anchor-id="pontos-importantes-1">Pontos importantes</h3>
+<ul>
+<li>lambda = 0,75: existe forte autocorrelação espacial nos componentes não observados do modelo.</li>
+<li>O LR test para lambda é altamente significativo (p &lt; 2e-16). Isso valida o uso do modelo CAR em vez de OLS simples.</li>
+</ul>
+</section>
+<section id="efeito-das-variáveis-1" class="level3">
+<h3 class="anchored" data-anchor-id="efeito-das-variáveis-1">Efeito das variáveis</h3>
+<section id="popatend_esg_san_2122-coeficiente-positivo-e-significativo.-semelhante-ao-ocorrido-no-modelo-sar." class="level4">
+<h4 class="anchored" data-anchor-id="popatend_esg_san_2122-coeficiente-positivo-e-significativo.-semelhante-ao-ocorrido-no-modelo-sar.">PopAtend_Esg_San_2122: coeficiente positivo e significativo. Semelhante ao ocorrido no modelo SAR.</h4>
+</section>
+<section id="saude_familia_23-negativo-e-estatisticamente-significativa.-isso-sugere-que-a-cobertura-de-equipes-de-saúde-da-família-reduz-variação-adicional-relevante-na-raiz-da-incidência." class="level4">
+<h4 class="anchored" data-anchor-id="saude_familia_23-negativo-e-estatisticamente-significativa.-isso-sugere-que-a-cobertura-de-equipes-de-saúde-da-família-reduz-variação-adicional-relevante-na-raiz-da-incidência.">Saude_Familia_23: negativo e estatisticamente significativa. Isso sugere que, a cobertura de equipes de saúde da família reduz variação adicional relevante na raiz da incidência.</h4>
+</section>
+<section id="investsaude_2223-negativo-e-significativo.-no-modelo-car-o-investimento-público-em-saúde-impacta-significativa-a-queda-de-incidência." class="level4">
+<h4 class="anchored" data-anchor-id="investsaude_2223-negativo-e-significativo.-no-modelo-car-o-investimento-público-em-saúde-impacta-significativa-a-queda-de-incidência.">InvestSaude_2223: negativo e significativo. No modelo car, o investimento público em saúde impacta significativa a queda de incidência.</h4>
+</section>
+</section>
+<section id="análise-de-resíduos-do-modelo-car" class="level3">
+<h3 class="anchored" data-anchor-id="análise-de-resíduos-do-modelo-car">Análise de resíduos do modelo CAR</h3>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>res_CAR <span class="ot">&lt;-</span> <span class="fu">residuals</span>(modelo_car)</span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a><span class="fu">hist</span>(res_CAR, <span class="at">breaks =</span> <span class="dv">30</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="QMD_Modulo1_files/figure-html/normalidade%20car-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb33"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="fu">qqnorm</span>(res_CAR)</span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a><span class="fu">qqline</span>(res_CAR)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="QMD_Modulo1_files/figure-html/normalidade%20car-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Semelhante ao modelo SAR:</p>
+<ul>
+<li><p>No histograma, os resíduos aparentam estar aproximadamente normais.</p></li>
+<li><p>O Q-Q plot demonstra bom alinhamento com a reta teórica, sugerindo adequação dos pressupostos do modelo (com pequena diferença nas caldas).</p></li>
+</ul>
+<p>Verificamos se os resíduos possuem dependência espacial.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="fu">moran.test</span>(res_CAR, lw, <span class="at">zero.policy =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Moran I test under randomisation
+
+data:  res_CAR  
+weights: lw    
+
+Moran I statistic standard deviate = -6.8521, p-value = 1
+alternative hypothesis: greater
+sample estimates:
+Moran I statistic       Expectation          Variance 
+    -0.1472034652     -0.0011737089      0.0004541869 </code></pre>
+</div>
+</div>
+<p>O teste de Moran aplicado aos resíduos do modelo CAR não indicou autocorrelação espacial significativa, sugerindo que o modelo capturou adequadamente a dependência espacial presente nos dados.</p>
+</section>
+<section id="mapas-do-modelo-car" class="level3">
+<h3 class="anchored" data-anchor-id="mapas-do-modelo-car">Mapas do modelo CAR</h3>
+<p>Semelhante ao modelo SAR, selecionamos os valores ajustados/estimados pelo modelo CAR e os resíduos associados.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a>ShapeMG <span class="ot">&lt;-</span> ShapeMG <span class="sc">%&gt;%</span></span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">Ajustado_CAR =</span> <span class="fu">fitted</span>(modelo_car),</span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">Residuos_CAR =</span> <span class="fu">residuals</span>(modelo_car)</span>
+<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Configuramos os mapas.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb37"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a>mapa5 <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(ShapeMG) <span class="sc">+</span></span>
+<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> Ajustado_CAR), <span class="at">color =</span> <span class="cn">NA</span>) <span class="sc">+</span></span>
+<span id="cb37-3"><a href="#cb37-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_viridis_c</span>(<span class="at">option =</span> <span class="st">"magma"</span>, <span class="at">name =</span> <span class="st">"Ajustado"</span>) <span class="sc">+</span></span>
+<span id="cb37-4"><a href="#cb37-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Valores Ajustados (CAR)"</span>) <span class="sc">+</span></span>
+<span id="cb37-5"><a href="#cb37-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
+<span id="cb37-6"><a href="#cb37-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
+<span id="cb37-7"><a href="#cb37-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.text =</span> <span class="fu">element_blank</span>(),</span>
+<span id="cb37-8"><a href="#cb37-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.title =</span> <span class="fu">element_blank</span>(),</span>
+<span id="cb37-9"><a href="#cb37-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">panel.grid =</span> <span class="fu">element_blank</span>()</span>
+<span id="cb37-10"><a href="#cb37-10" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb37-11"><a href="#cb37-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb37-12"><a href="#cb37-12" aria-hidden="true" tabindex="-1"></a>lim_res <span class="ot">&lt;-</span> <span class="fu">max</span>(<span class="fu">abs</span>(ShapeMG<span class="sc">$</span>Residuos_CAR), <span class="at">na.rm =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb37-13"><a href="#cb37-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb37-14"><a href="#cb37-14" aria-hidden="true" tabindex="-1"></a>mapa6 <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(ShapeMG) <span class="sc">+</span></span>
+<span id="cb37-15"><a href="#cb37-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> Residuos_CAR), <span class="at">color =</span> <span class="cn">NA</span>) <span class="sc">+</span></span>
+<span id="cb37-16"><a href="#cb37-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_gradient2</span>(</span>
+<span id="cb37-17"><a href="#cb37-17" aria-hidden="true" tabindex="-1"></a>    <span class="at">low =</span> <span class="fu">muted</span>(<span class="st">"blue"</span>),</span>
+<span id="cb37-18"><a href="#cb37-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">mid =</span> <span class="st">"white"</span>,</span>
+<span id="cb37-19"><a href="#cb37-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">high =</span> <span class="fu">muted</span>(<span class="st">"red"</span>),</span>
+<span id="cb37-20"><a href="#cb37-20" aria-hidden="true" tabindex="-1"></a>    <span class="at">midpoint =</span> <span class="dv">0</span>,</span>
+<span id="cb37-21"><a href="#cb37-21" aria-hidden="true" tabindex="-1"></a>    <span class="at">limits =</span> <span class="fu">c</span>(<span class="sc">-</span>lim_res, lim_res),</span>
+<span id="cb37-22"><a href="#cb37-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">name =</span> <span class="st">"Resíduos"</span></span>
+<span id="cb37-23"><a href="#cb37-23" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb37-24"><a href="#cb37-24" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Resíduos do Modelo CAR"</span>) <span class="sc">+</span></span>
+<span id="cb37-25"><a href="#cb37-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
+<span id="cb37-26"><a href="#cb37-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
+<span id="cb37-27"><a href="#cb37-27" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.text =</span> <span class="fu">element_blank</span>(),</span>
+<span id="cb37-28"><a href="#cb37-28" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.title =</span> <span class="fu">element_blank</span>(),</span>
+<span id="cb37-29"><a href="#cb37-29" aria-hidden="true" tabindex="-1"></a>    <span class="at">panel.grid =</span> <span class="fu">element_blank</span>()</span>
+<span id="cb37-30"><a href="#cb37-30" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb37-31"><a href="#cb37-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb37-32"><a href="#cb37-32" aria-hidden="true" tabindex="-1"></a>(mapa1 <span class="sc">+</span> mapa2) <span class="sc">/</span> (mapa5 <span class="sc">+</span> mapa6)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="QMD_Modulo1_files/figure-html/mapas%20car-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Os primeiros dois mapas (superiores) são identicos aos exibidos antes.</p>
+<p>– No terceiro mapa (inferior esquerdo), os valores ajustados pelo modelo CAR reproduzem o padrão espacial observado na variável transformada, porém com maior suavização regional. Nota-se coerência espacial, indicando que o modelo capturou a dependência entre municípios vizinhos, preservando a estrutura territorial da incidência.</p>
+<p>– No quarto mapa (inferior direito), os resíduos não apresentam padrão espacial evidente. A distribuição parece aleatória, sem formação de clusters consistentes de super ou subestimação. Esse resultado é consistente com o teste de Moran aplicado aos resíduos, sugerindo que a dependência espacial foi adequadamente modelada.</p>
+</section>
+</section>
+<section id="visualização-geral" class="level2">
+<h2 class="anchored" data-anchor-id="visualização-geral">Visualização geral</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb38"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a>(mapa1 <span class="sc">+</span> mapa2) <span class="sc">/</span> (mapa3 <span class="sc">+</span> mapa4) <span class="sc">/</span> (mapa5 <span class="sc">+</span> mapa6)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="QMD_Modulo1_files/figure-html/todos%20os%20mapas-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Ambos os modelos espaciais conseguem capturar a dependência territorial da dengue, reduzindo a autocorrelação residual observada no modelo linear tradicional. Visualmente, SAR e CAR produzem superfícies ajustadas bastante semelhantes, sugerindo que a estrutura espacial é robusta e não depende fortemente da especificação escolhida.</p>
+</section>
+
+
+<div class="no-row-height column-margin column-container"><section id="conecte-se-conosco" class="level2 margin-aside">
+<h2 class="anchored" data-anchor-id="conecte-se-conosco">🌐 Conecte-se conosco</h2>
+<p>👨‍💻 <strong>Daví Sousa</strong><br>
+🔗 <a href="https://www.linkedin.com/in/daví-sousa-41b874180/">LinkedIn</a><br>
+📚 <a href="http://lattes.cnpq.br/4206431803366749">Lattes</a></p>
+<p>👩‍💻 <strong>Marcela Araujo</strong><br>
+🔗 <a href="https://www.linkedin.com/in/marcela-araujoo/">LinkedIn</a><br>
+📚 <a href="http://lattes.cnpq.br/8522510498165639">Lattes</a></p>
+<hr>
+<p>✨ Este trabalho foi desenvolvido com <a href="https://quarto.org">Quarto</a> e com ❤️</p>
+</section></div></main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    // For code content inside modals, clipBoardJS needs to be initialized with a container option
+    // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp('/' + window.location.host + '/');
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      // TODO in 1.5, we should make sure this works without a callout special case
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
