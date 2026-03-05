@@ -1,0 +1,432 @@
+---
+title: "Módulo 2: Geoestatística para dados não normais"
+author: 
+    - name: Daví Barbosa Pereira de Sousa 
+      affiliation: Universidade Federal de Lavras 
+    - name: Marcela Silva de Araújo 
+      affiliation: Universidade Federal de Lavras 
+format: 
+  html: 
+    theme: cosmo
+editor: visual
+---
+
+## Pacotes
+
+Leitura dos pacotes necessário para executar as etapas de manipulação, análise geoestatística, ajuste de modelos e visualização.
+
+```{r pacotes}
+#| message: false
+#| warning: false
+library(readr)        # Leitura da base de dados
+library(geoR)         # Análise geoestatística
+library(geobr)        # Obtenção de shapefiles do IBGE
+library(dplyr)        # Manipulação de dados
+library(sf)           # Manipulação de dados espaciais
+library(ggplot2)      # Criação de gráficos
+```
+
+## Leitura dos dados
+
+Importamos a base de dados original e avaliamos suas características iniciais por meio de estatísticas descritivas.
+
+```{r leitura da base}
+df_airbnb <- read.csv("listings.csv")
+glimpse(df_airbnb)
+```
+
+## Filtros e limpeza
+
+Convertimos a variável de data para o formato adequado e aplicamos filtros para manter apenas observações relevantes ao estudo. Selecionamos imóveis avaliados a partir de 2025, com preço até R\$500 e mantemos apenas um imóvel por coordenada (o de menor valor), evitando duplicidade espacial.
+
+```{r filtros}
+df_airbnb$last_review <- as.Date(df_airbnb$last_review)
+
+df_airbnb_2025 <- df_airbnb |> 
+  filter(last_review >= "2025-01-01") |>  # Filtrar avaliações de 2025
+  filter(!is.na(price)) |>                # Remover preços NA
+  filter(price <=500)  |>                 # Remover preços superiores a 500
+  group_by(latitude, longitude) |>        # Agrupar por coordenadas
+  slice_min(price, with_ties = FALSE) |>  # Manter o de menor preço
+  ungroup()
+```
+
+Avaliamos as estatísticas resumo após os filtros aplicados.
+
+```{r descritiva 1}
+summary(df_airbnb_2025)
+```
+
+Visualizamos a distribuição dos preços para investigar assimetria e possíveis valores extremos.
+
+```{r boxplot 1}
+boxplot(df_airbnb_2025$price)
+```
+
+## Amostra
+
+Para reduzir custo computacional, selecionamos uma amostra aleatória de 1.000 observações. Fixamos uma semente para garantir reprodutibilidade.
+
+```{r amostra}
+set.seed(123)
+amostra <- sample_n(df_airbnb_2025, 1000)
+```
+
+Verificamos novamente a distribuição da variável resposta na amostra.
+
+```{r boxplot 2}
+boxplot(amostra$price)
+```
+
+## Estruturação geoestatística dos dados
+
+Transformamos o conjunto amostral no objeto geoespacial utilizado pelo `geoR`, definindo coordenadas e variável resposta. Em seguida, avaliamos o resumo dos dados e testamos a hipótese de normalidade.
+
+```{r dados geoestatisticos}
+airbnb <- as.geodata(amostra, coords.col = c(8,7), data.col = 10)
+summary(airbnb)        # Exibe um resumo dos dados
+```
+
+As coordenadas geográficas indicam que os imóveis estão distribuídos aproximadamente entre as longitudes -43,64 e -43,10 e latitudes -23,06 e -22,75, cobrindo uma faixa espacial coerente com a área urbana da cidade. As distâncias entre pontos variam de praticamente zero até cerca de 0,57 graus, sugerindo presença de imóveis bastante próximos entre si, o que é relevante para análise de dependência espacial. Quanto aos valores, os preços variam de R\$ 54 a R\$ 500, com mediana de R\$ 250 e média de R\$ 262,77, indicando leve assimetria à direita, isto é, presença de imóveis com preços mais elevados puxando a média para cima.
+
+```{r}
+plot(airbnb)  # Plota os dados
+```
+
+-   Primeiro, no painel espacial (canto superior esquerdo), vemos que os imóveis não estão distribuídos aleatoriamente: há concentração clara em uma faixa longitudinal específica, sugerindo agrupamento espacial, exatamente o tipo de padrão que justifica o uso de geoestatística. Pontos muito próximos indicam potencial autocorrelação espacial, ou seja, valores de diárias tendem a se parecer com os valores de imóveis vizinhos.
+
+-   Segundo, os diagramas de dispersão entre coordenadas e preços mostram que não há uma relação linear simples entre localização (X ou Y) e valor, mas há indícios de estrutura: em certas faixas de longitude há maior concentração de preços elevados. Isso sugere tendência espacial, que pode precisar ser modelada antes do cálculo do variograma.
+
+-   Por fim, o histograma indica distribuição assimétrica à direita, com maior concentração entre aproximadamente R\$150 e R\$350 e cauda superior estendendo-se até R\$500. A média maior que a mediana já antecipava isso.
+
+```{r}
+shapiro.test(airbnb$data)
+```
+
+Os preços apresentam desvio significativo da normalidade segundo o teste de Shapiro–Wilk (p \< 0,001).
+
+## Semivariograma empírico
+
+Calculamos o semivariograma utilizando o estimador clássico e analisamos a dispersão dentro das classes de distância.
+
+```{r semivariograma classico}
+varioA<-variog(airbnb, bin.cloud=T, estimator.type="classical")
+boxplot(varioA$bin.cloud, xlab="Numero da Classe de distâncias", ylab="Diferenças ao quadrado")
+```
+
+O boxplot da nuvem de variograma mostra que nas primeiras classes (distâncias menores), as diferenças ao quadrado tendem a ser menores e menos dispersas. Conforme a distância aumenta, a variabilidade cresce e a dispersão dentro das classes também aumenta. Isso sugere dependência espacial: imóveis próximos tendem a ter preços mais semelhantes, enquanto imóveis mais distantes apresentam maior discrepância de valores.
+
+Note também a presença de muitos *outliers* em praticamente todas as classes. Isso é coerente com a assimetria já observada na distribuição dos preços. Valores muito altos (ou muito baixos) ampliam as diferenças ao quadrado, inflando a dispersão. Em termos práticos, isso pode afetar o ajuste do modelo teórico do variograma.
+
+Repetimos o cálculo utilizando o estimador robusto de Cressie-Hawkins (modulus), mais apropriado para dados não normais ou com presença de *outliers*.
+
+```{r semivariograma robusto}
+varioB<-variog(airbnb, bin.cloud=T, estimator.type="modulus")
+boxplot(varioB$bin.cloud, xlab="Numero da Classe de distâncias", ylab="Diferenças ao quadrado")
+```
+
+O uso do estimador robusto de Cressie–Hawkins reduziu a influência de outliers presentes na distribuição dos preços, produzindo um padrão de variabilidade espacial mais estável e consistente. A estrutura de dependência espacial permanece evidente, porém com menor dispersão intra-classe.
+
+Construímos o semivariograma binned utilizando o estimador robusto.
+
+```{r semivariograma bin}
+vc=variog(airbnb, option="bin", estimator.type="modulus")
+plot(vc)
+```
+
+Analisamos possíveis direcionalidades \[(an)isotropia\] por meio do variograma em quatro direções.
+
+```{r semivariograma 4 direçoes}
+v4=variog4(airbnb, option="bin",
+           estimator.type="modulus")
+plot(v4)
+lines(vc, type="l", lwd=3, col="red")
+```
+
+Sem nenhum problema, aparenta estar isotrópico, então, limitamos a distância máxima para focar na região onde há estrutura espacial mais relevante. Neste caso, consideramos a distância de até 90 metros (0,09km).
+
+```{r semivariograma 80m}
+semi <- variog(airbnb, max.dist = 0.09, 
+               option="bin", estimator.type="modulus");semi
+plot(semi)
+```
+
+O variograma ajustado indica dependência espacial na variável analisada, com patamar estimado em 20.000, alcance de 0,08 e efeito pepita de 10.000. Isso significa que a semivariância cresce com a distância até aproximadamente 0,08 unidades, ponto a partir do qual a dependência espacial praticamente desaparece. O valor relativamente elevado da pepita sugere que há considerável variabilidade em pequenas escalas, enquanto a diferença entre o patamar total e a pepita indica que cerca de metade da variabilidade é explicada por estrutura espacial. Em termos práticos, há influência do efeito locacional até o alcance estimado, mas também uma parcela importante de variação que não é explicada apenas pela proximidade espacial.
+
+## Ajuste de modelos teóricos
+
+Ajustamos diferentes modelos teóricos de semivariograma por mínimos quadrados ponderados (Cressie), com os mesmos valores iniciais, para posterior comparação de desempenho.
+
+As informações utilizadas foram tiradas do semivariograma anterior, do qual sigma2 (patamar) = 20.000, phi (alcance) = 0,08 e tau2 (pepita) = 10.000.
+
+```{r ajuste dos modelos}
+# Ajustar modelo: matern
+modelo_matern <- variofit(semi,
+                          cov.model = "matern",
+                          ini.cov.pars = c(20000, 0.08),
+                          nugget =10000, wei="cressie",
+                          min="optim")
+
+# Ajustar modelo: exponential
+modelo_exponential <- variofit(semi,
+                               cov.model = "exponential",
+                               ini.cov.pars = c(20000, 0.08),
+                               nugget =10000, wei="cressie",
+                               min="optim")
+
+# Ajustar modelo: gaussian
+modelo_gaussian <- variofit(semi,
+                            cov.model = "gaussian",
+                            ini.cov.pars = c(20000, 0.08),
+                            nugget =10000, wei="cressie",
+                            min="optim")
+
+# Ajustar modelo: spherical
+modelo_spherical <- variofit(semi,
+                             cov.model = "spherical",
+                             ini.cov.pars = c(20000, 0.08),
+                             nugget =10000, wei="cressie",
+                             min="optim")
+
+# Ajustar modelo: circular
+modelo_circular <- variofit(semi,
+                            cov.model = "circular",
+                            ini.cov.pars = c(20000, 0.08),
+                            nugget =10000, wei="cressie",
+                            min="optim")
+
+# Ajustar modelo: cubic
+modelo_cubic <- variofit(semi,
+                         cov.model = "cubic",
+                         ini.cov.pars = c(20000, 0.08),
+                         nugget =10000, wei="cressie",
+                         min="optim")
+
+# Ajustar modelo: wave
+modelo_wave <- variofit(semi,
+                        cov.model = "wave",
+                        ini.cov.pars = c(20000, 0.08),
+                        nugget =10000, wei="cressie",
+                        min="optim")
+
+# Ajustar modelo: powered.exponential
+modelo_powered <- variofit(semi,
+                           cov.model = "powered.exponential",
+                           ini.cov.pars = c(20000, 0.08),
+                           nugget =10000, wei="cressie",
+                           min="optim")
+
+# Ajustar modelo: cauchy
+modelo_cauchy <- variofit(semi,
+                          cov.model = "cauchy",
+                          ini.cov.pars = c(20000, 0.08),
+                          nugget =10000, wei="cressie",
+                          min="optim")
+
+# Ajustar modelo: gneiting
+modelo_gneiting <- variofit(semi,
+                            cov.model = "gneiting",
+                            ini.cov.pars = c(20000, 0.08),
+                            nugget =10000, wei="cressie",
+                            min="optim")
+```
+
+Plotamos o semivariograma experimental juntamente com todos os modelos ajustados para comparação visual.
+
+```{r semivariograma com modelos}
+# Plot do semivariograma experimental
+plot(semi, 
+     pch = 19, 
+     col = "blue", 
+     xlab = "Distância (km)", 
+     ylab = "Semivariância")
+
+# Adiciona cada modelo com uma cor diferente
+lines(modelo_matern, col = "red", lwd = 2)
+lines(modelo_exponential, col = "green", lwd = 2)
+lines(modelo_gaussian, col = "purple", lwd = 2)
+lines(modelo_spherical, col = "orange", lwd = 2)
+lines(modelo_circular, col = "brown", lwd = 2)
+lines(modelo_cubic, col = "pink", lwd = 2)
+lines(modelo_wave, col = "cyan", lwd = 2)
+lines(modelo_powered, col = "darkgreen", lwd = 2)
+lines(modelo_cauchy, col = "darkblue", lwd = 2)
+lines(modelo_gneiting, col = "black", lwd = 2)
+
+# Legendas
+legend("bottomright",
+       legend = c("Matern", "Exponential", "Gaussian", "Spherical",
+                  "Circular", "Cubic", "Wave",
+                  "Powered Exponential", "Cauchy", "Gneiting"),
+       col = c("red", "green", "purple", "orange",
+               "brown", "pink", "cyan",
+               "darkgreen", "darkblue", "black"),
+       lwd = rep(2, 10),
+       cex = 0.8,
+       bty = "n")
+```
+
+Comparamos os valores da função objetivo dos modelos ajustados. O menor valor indica melhor ajuste ao semivariograma empírico.
+
+```{r comparação dos valores}
+sort(c(
+  matern       = modelo_matern$value,
+  exponential  = modelo_exponential$value,
+  gaussian     = modelo_gaussian$value,
+  spherical    = modelo_spherical$value,
+  circular     = modelo_circular$value,
+  cubic        = modelo_cubic$value,
+  wave         = modelo_wave$value,
+  powered      = modelo_powered$value,
+  cauchy       = modelo_cauchy$value,
+  gneiting     = modelo_gneiting$value
+))
+```
+
+Selecionamos o modelo Wave, pois apresentou o melhor desempenho segundo o critério de ajuste.
+
+```{r wave}
+plot(semi, 
+     pch = 19, 
+     col = "blue", 
+     xlab = "Distância (km)", 
+     ylab = "Semivariância")
+lines(modelo_wave, col = "cyan", lwd = 2)
+```
+
+O modelo Wave apresentou o melhor desempenho por conseguir acompanhar de forma mais fiel a estrutura de dependência espacial observada no variograma experimental. Visualmente, a curva teórica ajusta-se bem aos pontos empíricos ao longo de toda a faixa de distâncias, capturando tanto o crescimento gradual da semivariância quanto o comportamento mais suave em curtas distâncias. Em termos práticos, isso indica que o modelo consegue reproduzir a continuidade espacial do fenômeno com menor erro médio de ajuste, justificando sua seleção.
+
+## Krigagem ordinária
+
+Visualizamos os pontos amostrais e construímos a grade regular onde será realizada a interpolação.
+
+```{r grade}
+points(airbnb, lambda=0, pt.div="equal")
+grid_krig <- expand.grid(
+  x = seq(-43.7, -43.1, length.out = 300),
+  y = seq(-23.1, -22.7, length.out = 300)
+)
+points(grid_krig, pch="+")
+```
+
+Definimos o controle da krigagem ordinária utilizando o modelo Wave ajustado e realizamos a interpolação.
+
+```{r krigagem}
+# Define o controle de krigagem usando o modelo 'Wave' ajustado anteriormente
+KC <- krige.control(type = "OK", obj.model = modelo_wave)
+# Realiza a krigagem ordinária nos pontos da grade
+airbnb.kc <- krige.conv(airbnb, loc = grid_krig, krige = KC)
+```
+
+## Mapa da superfície interpolada
+
+Construímos o mapa da predição obtida via krigagem.
+
+```{r interpolação}
+# Base da interpolação
+df_interp <- data.frame(
+  x = grid_krig[, 1],
+  y = grid_krig[, 2],
+  value = airbnb.kc$predict
+)
+
+# Base dos pontos amostrados
+df_pts <- data.frame(
+  x = airbnb$coords[, 1],
+  y = airbnb$coords[, 2]
+)
+
+p1 <- ggplot() +
+  geom_raster(data = df_interp, aes(x = x, y = y, fill = value), interpolate = TRUE) +
+  geom_contour(data = df_interp, aes(x = x, y = y, z = value), color = "black", linewidth = 0.3) +
+  geom_point(data = df_pts, aes(x = x, y = y), color = "red", size = 1) +
+  scale_fill_viridis_c(name = "Interpolado") +
+  coord_equal() +
+  theme_minimal() +
+  labs(
+    x = "Longitude",
+    y = "Latitude"
+  ); p1
+```
+
+O mapa interpolado revela um padrão espacial bem definido, com valores mais elevados concentrados na porção sudeste da área de estudo, enquanto as menores estimativas aparecem no setor noroeste. Observa-se que a maior densidade de pontos amostrais coincide justamente com a faixa litorânea, onde se localizam as praias, indicando maior concentração do fenômeno nessas áreas. Esse adensamento sugere uma relação direta com a atratividade turística e a dinâmica costeira, que tendem a intensificar a presença e a variabilidade do atributo analisado. A superfície suavizada acompanha essa tendência, evidenciando um gradiente espacial consistente e reforçando a existência de dependência espacial capturada pelo modelo.
+
+## Mapa da incerteza
+
+Construímos o mapa da raiz da variância da krigagem, representando a incerteza espacial das estimativas.
+
+```{r incerteza}
+# Imagem da variância da krigagem (incerteza)
+# Criar um data frame para a variância da krigagem
+df_var <- data.frame(
+  x = grid_krig[, 1],
+  y = grid_krig[, 2],
+  variance = sqrt(airbnb.kc$krige.var)  # Raiz quadrada da variância
+)
+
+
+p2 <- ggplot() +
+  geom_raster(data = df_var, aes(x = x, y = y, fill = variance), interpolate = TRUE) +
+  geom_point(data = df_pts, aes(x = x, y = y), color = "red", size = 1) +
+  scale_fill_viridis_c(name = "Variância") +
+  coord_equal() +
+  theme_minimal() +
+  labs(
+    x = "Longitude",
+    y = "Latitude"
+  ); p2
+```
+
+O mapa de variância representa a incerteza associada às estimativas interpoladas. Observa-se que as menores variâncias concentram-se na região onde há maior densidade de pontos amostrais, especialmente ao longo da faixa litorânea, onde estão as praias. Isso é esperado em krigagem: quanto mais próximos e numerosos os dados observados, menor a incerteza da predição.
+
+## Validação cruzada
+
+Realizamos validação cruzada leave-one-out para avaliar o desempenho preditivo do modelo Wave.
+
+```{r validação cruzada}
+vcwave <- xvalid(airbnb, model = modelo_wave)
+summary(vcwave)
+```
+
+-   Primeiro ponto crucial: o erro médio foi praticamente zero (-0,07). Isso é excelente. Significa que o modelo Wave não está consistentemente superestimando nem subestimando os valores. Em média, o erro se cancela. Isso é o que queremos.
+
+-   Segundo ponto: os erros padronizados têm média praticamente zero (\<0,001) e desvio padrão de aproximadamente 1 (1.008). Isso é um sinal muito forte de que o modelo está bem calibrado. Quando o desvio padrão dos erros padronizados fica próximo de 1, significa que a variância de krigagem está coerente com a variabilidade real observada. Em outras palavras: a incerteza estimada faz sentido.
+
+-   Olhando os extremos: há erros relativamente grandes (entre -235 e 279), o que indica presença de valores locais difíceis de prever, possivelmente outliers ou regiões com transições abruptas. Isso é comum em dados de preço de Airbnb, especialmente em áreas turísticas com heterogeneidade forte.
+
+-   O Wave não só ajustou bem o variograma, como também se comportou adequadamente quando testado ponto a ponto.
+
+Analisamos graficamente os resíduos padronizados da validação. Dos quais, diagrama de dispersão dos valores observados contra os valores preditos (superior esquerdo), gráfico de probabilidade normal (central esquerdo), mapa dos redíduos positivos (+) e negativos (-) (inferior esquerdo), histograma (superior direito), diagrama de dispersão dos resíduos contra os valores preditos (central direito) e diagrama de dispersão dos resíduos versus valores observados (inferior direito).
+
+```{r graficos vc}
+par(mfcol=c(3,2))
+plot(vcwave, error=F, std.error=T)
+```
+
+-   O diagrama de dispersão entre valores observados e preditos indica alinhamento razoável em torno da reta 1:1, sugerindo boa capacidade preditiva do modelo e ausência de viés sistemático evidente.
+
+-   O gráfico de probabilidade normal mostra que os resíduos padronizados seguem aproximadamente a distribuição normal teórica, com pequenas discrepâncias nas extremidades, o que é esperado em dados reais.
+
+-   O mapa dos resíduos evidencia distribuição espacial relativamente homogênea entre valores positivos e negativos, não indicando padrões espaciais remanescentes significativos, o que sugere que a estrutura de dependência espacial foi adequadamente capturada pelo modelo.
+
+-   O histograma apresenta formato aproximadamente simétrico e centrado em zero, reforçando a adequação da padronização dos resíduos.
+
+-   O diagrama de dispersão dos resíduos em função dos valores preditos não demonstra tendência ou padrão sistemático, indicando homocedasticidade.
+
+-   Por fim, o gráfico dos resíduos versus valores observados mantém dispersão semelhante, sem evidências claras de estrutura não modelada.
+
+::: aside
+## 🌐 Conecte-se conosco
+
+👨‍💻 **Daví Sousa**\
+🔗 [LinkedIn](https://www.linkedin.com/in/daví-sousa-41b874180/)\
+📚 [Lattes](http://lattes.cnpq.br/4206431803366749)
+
+👩‍💻 **Marcela Araujo**\
+🔗 [LinkedIn](https://www.linkedin.com/in/marcela-araujoo/)\
+📚 [Lattes](http://lattes.cnpq.br/8522510498165639)
+
+------------------------------------------------------------------------
+
+✨ Este trabalho foi desenvolvido com [Quarto](https://quarto.org) e com ❤️
+:::
